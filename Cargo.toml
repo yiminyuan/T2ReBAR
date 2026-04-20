@@ -1,0 +1,15 @@
+[package]
+name = "t2rebar"
+version = "0.1.0"
+edition = "2021"
+description = "Resize PCIe BARs on Mac Pro 2019 so GPU VRAM is fully CPU-visible."
+license = "GPL-3.0-only"
+publish = false
+
+[[bin]]
+name = "t2rebar"
+path = "src/main.rs"
+
+[profile.release]
+lto = "thin"
+strip = true
