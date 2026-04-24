@@ -86,9 +86,9 @@ Size index `N` maps to `2^(20+N)` bytes. Common values:
 | 16  | 64 GiB  |
 | 17  | 128 GiB |
 
-### Recommended per-boot procedure
+### Manual per-boot procedure
 
-Until a boot-time service exists, apply the resize after login:
+Applied manually after login:
 
 ```
 sudo systemctl stop display-manager
@@ -117,6 +117,48 @@ sudo t2rebar execute --target=current --yes
 
 If every GPU comes back bound to its original driver, the pipeline works on
 your hardware.
+
+## Boot integration (systemd)
+
+Once the manual flow works reliably, install the bundled systemd unit so the
+resize happens automatically on every boot, before display-manager and T2FanRD
+come up.
+
+```
+cd T2ReBAR
+cargo build --release
+sudo install -m 0755 target/release/t2rebar /usr/local/bin/t2rebar
+sudo install -m 0644 systemd/t2rebar.service /etc/systemd/system/t2rebar.service
+sudo systemctl daemon-reload
+sudo systemctl enable t2rebar.service
+```
+
+The unit is `Type=oneshot` with `RemainAfterExit=yes`, ordered:
+
+- `After=sysinit.target` — udev coldplug has run, drivers are bound and safe to
+  cycle
+- `Before=display-manager.service t2fanrd.service graphical.target` — beat any
+  consumer that would block unbind
+- `ConditionKernelCommandLine=pci=realloc` — skip cleanly on boots without the
+  flag, rather than failing
+- `WantedBy=multi-user.target` — only runs in normal boots, not rescue/emergency
+
+Inspect after reboot:
+
+```
+systemctl status t2rebar.service
+journalctl -u t2rebar.service -b
+```
+
+Disable (to stop auto-resize on next boot):
+
+```
+sudo systemctl disable t2rebar.service
+```
+
+Interaction with `rollback`: if you run `t2rebar rollback` to return to 256 MiB
+BARs, that lasts until the next boot — at which point the enabled service will
+resize again. `disable` the service first if you want the rollback to stick.
 
 ## Recovery
 
